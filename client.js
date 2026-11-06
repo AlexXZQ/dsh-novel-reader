@@ -21,7 +21,7 @@ window.__ModuleLoader__.load({
     const SETTINGS_KEY = 'dsh.novel-reader.settings.v1'
     const MAX_IMPORT_BYTES = 80 * 1024 * 1024
     const PAGE_GAP = 40
-    const DEFAULT_SETTINGS = { theme: 'paper', font: 'song', fontSize: 16, lineHeight: 1.95, disguise: true }
+    const DEFAULT_SETTINGS = { version: 2, theme: 'auto', font: 'song', fontSize: 16, lineHeight: 1.95, disguise: true }
 
     /** The fake WPS document names the cover picks from. */
     const FAKE_DOCS = [
@@ -148,6 +148,7 @@ window.__ModuleLoader__.load({
       'toc.search': '筛选章节',
       'toc.empty': '没有匹配的章节',
       'settings.theme': '背景',
+      'settings.theme.auto': '自动',
       'settings.theme.paper': '纸白',
       'settings.theme.sepia': '米黄',
       'settings.theme.night': '夜间',
@@ -161,7 +162,7 @@ window.__ModuleLoader__.load({
       'settings.line.compact': '紧凑',
       'settings.line.normal': '标准',
       'settings.line.loose': '宽松',
-      'settings.hint': '只影响阅读区，自动保存',
+      'settings.hint': '背景选「自动」时跟随 DSH 深浅色；只影响阅读区，自动保存',
       'time.justNow': '刚刚',
       'time.minutes': '{n} 分钟前',
       'time.hours': '{n} 小时前',
@@ -261,6 +262,7 @@ window.__ModuleLoader__.load({
       'toc.search': 'Filter chapters',
       'toc.empty': 'No matching chapters',
       'settings.theme': 'Background',
+      'settings.theme.auto': 'Auto',
       'settings.theme.paper': 'Paper',
       'settings.theme.sepia': 'Sepia',
       'settings.theme.night': 'Night',
@@ -274,7 +276,7 @@ window.__ModuleLoader__.load({
       'settings.line.compact': 'Tight',
       'settings.line.normal': 'Normal',
       'settings.line.loose': 'Loose',
-      'settings.hint': 'Applies to the reading pane only; changes save automatically',
+      'settings.hint': 'Auto follows the DSH light/dark theme; applies to the reading pane and saves automatically',
       'time.justNow': 'just now',
       'time.minutes': '{n} min ago',
       'time.hours': '{n} h ago',
@@ -623,8 +625,15 @@ window.__ModuleLoader__.load({
       try {
         const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null')
         if (!raw || typeof raw !== 'object') return { ...DEFAULT_SETTINGS }
+        const known = ['auto', 'paper', 'sepia', 'night']
+        const theme = known.includes(raw.theme) ? raw.theme : DEFAULT_SETTINGS.theme
+        // Settings written before the auto theme existed always carried the old
+        // paper default. Move those to auto once so the reader follows a DSH
+        // theme switch without asking the reader to open settings again.
+        const legacy = !Number.isFinite(raw.version) || raw.version < 2
         return {
-          theme: ['paper', 'sepia', 'night'].includes(raw.theme) ? raw.theme : DEFAULT_SETTINGS.theme,
+          version: 2,
+          theme: legacy && theme === 'paper' ? 'auto' : theme,
           font: ['song', 'hei', 'kai', 'system'].includes(raw.font) ? raw.font : DEFAULT_SETTINGS.font,
           fontSize: Number.isFinite(raw.fontSize) ? clamp(Math.round(raw.fontSize), 12, 30) : DEFAULT_SETTINGS.fontSize,
           lineHeight: Number.isFinite(raw.lineHeight) ? clamp(raw.lineHeight, 1.4, 2.4) : DEFAULT_SETTINGS.lineHeight,
@@ -1856,6 +1865,7 @@ window.__ModuleLoader__.load({
 
     function Settings({ t, settings, disguise, onChange, onDisguise, onBoss, onClose }) {
       const themes = [
+        { value: 'auto', label: t('settings.theme.auto') },
         { value: 'paper', label: t('settings.theme.paper') },
         { value: 'sepia', label: t('settings.theme.sepia') },
         { value: 'night', label: t('settings.theme.night') },
@@ -1908,29 +1918,27 @@ window.__ModuleLoader__.load({
             ),
           ),
           h('div', { className: 'nr-pop-hint' }, t('disguise.hint')),
-          disguise
-            ? null
-            : h(
-                'div',
-                { className: 'nr-pop-row' },
-                h('span', { className: 'nr-pop-label' }, t('settings.theme')),
+          h(
+            'div',
+            { className: 'nr-pop-row' },
+            h('span', { className: 'nr-pop-label' }, t('settings.theme')),
+            h(
+              'div',
+              { className: 'nr-seg' },
+              themes.map((theme) =>
                 h(
-                  'div',
-                  { className: 'nr-seg' },
-                  themes.map((theme) =>
-                    h(
-                      'button',
-                      {
-                        key: theme.value,
-                        type: 'button',
-                        className: settings.theme === theme.value ? 'on' : '',
-                        onClick: () => onChange({ theme: theme.value }),
-                      },
-                      theme.label,
-                    ),
-                  ),
+                  'button',
+                  {
+                    key: theme.value,
+                    type: 'button',
+                    className: settings.theme === theme.value ? 'on' : '',
+                    onClick: () => onChange({ theme: theme.value }),
+                  },
+                  theme.label,
                 ),
               ),
+            ),
+          ),
           h(
             'div',
             { className: 'nr-pop-row' },
@@ -2230,7 +2238,7 @@ window.__ModuleLoader__.load({
       }
 
       function updateSettings(patch) {
-        const next = { ...settings, ...patch }
+        const next = { ...settings, ...patch, version: 2 }
         setSettings(next)
         try {
           localStorage.setItem(SETTINGS_KEY, JSON.stringify(next))
@@ -2484,6 +2492,7 @@ window.__ModuleLoader__.load({
           onDragLeave,
           onDrop,
           'data-library-status': library.status,
+          'data-theme': settings.theme,
         },
         view === 'reader' && settings.disguise && book
           ? h(DocHeader, {
@@ -2791,6 +2800,56 @@ window.__ModuleLoader__.load({
 .nr-doc-table .nr-doc-bar{height:5px;border-radius:2px;background:#e3e9f1;overflow:hidden;}
 .nr-doc-table .nr-doc-bar i{display:block;height:100%;background:#9db6d8;}
 .nr-doc-note{font-size:9.5px;line-height:1.5;color:#9aa1ab;margin-top:4px;}
+
+/* ---------------- 跟随 DSH 主题 ---------------- */
+/* auto reads the live DSH aliases instead of a fixed palette, so a theme
+   switch in DSH recolors the reader immediately without a re-render. */
+.nr-reader[data-theme=auto]{
+  --nr-bg:var(--dsw-alias-bg-base);
+  --nr-paper:var(--dsw-alias-bg-layer-1);
+  --nr-text:var(--dsw-alias-label-primary);
+  --nr-muted:var(--dsw-alias-label-secondary);
+  --nr-rule:var(--dsw-alias-border-l1);}
+.nr-reader[data-theme=auto] .nr-page-shell{border-color:var(--dsw-alias-border-l1);box-shadow:0 1px 2px rgba(0,0,0,.06),0 8px 20px rgba(0,0,0,.08);}
+.nr-root[data-theme=auto] .nr-doc{
+  --doc-bg:var(--dsw-alias-bg-base);
+  --doc-paper:var(--dsw-alias-bg-layer-1);
+  --doc-text:var(--dsw-alias-label-primary);
+  --doc-muted:var(--dsw-alias-label-secondary);
+  --doc-line:var(--dsw-alias-border-l1);}
+.nr-root[data-theme=auto] .nr-doc .nr-page-shell{border-color:var(--dsw-alias-border-l1);box-shadow:0 1px 2px rgba(0,0,0,.08),0 10px 26px rgba(0,0,0,.12);}
+.nr-root[data-theme=auto] .nr-docbar{background:var(--dsw-alias-bg-layer-2);border-bottom-color:var(--dsw-alias-border-l1);color:var(--dsw-alias-label-primary);}
+.nr-root[data-theme=auto] .nr-docname{color:var(--dsw-alias-label-primary);}
+.nr-root[data-theme=auto] .nr-docsaved{background:var(--dsw-alias-bg-layer-1);border-color:var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary);}
+.nr-root[data-theme=auto] .nr-docbar-icon,.nr-root[data-theme=auto] .nr-doctab-read{color:var(--dsw-alias-label-secondary);}
+.nr-root[data-theme=auto] .nr-doctabs{background:var(--dsw-alias-bg-layer-1);border-bottom-color:var(--dsw-alias-border-l1);}
+.nr-root[data-theme=auto] .nr-doctab{color:var(--dsw-alias-label-secondary);}
+.nr-root[data-theme=auto] .nr-doctab.on{color:var(--dsw-alias-brand-primary);border-bottom-color:var(--dsw-alias-brand-primary);}
+.nr-root[data-theme=auto] .nr-doctab-view:hover{color:var(--dsw-alias-brand-primary);}
+.nr-root[data-theme=auto] .nr-docbar .nr-iconbtn:hover,.nr-root[data-theme=auto] .nr-doctabs .nr-iconbtn:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);}
+.nr-root[data-theme=auto] .nr-doc .nr-ch-title,
+.nr-root[data-theme=auto] .nr-doc-report-title h2,
+.nr-root[data-theme=auto] .nr-doc .nr-h{color:var(--dsw-alias-label-primary);}
+.nr-root[data-theme=auto] .nr-doc-report-title{border-bottom-color:var(--dsw-alias-brand-primary);}
+.nr-root[data-theme=auto] .nr-doc-head,
+.nr-root[data-theme=auto] .nr-doc-foot{color:var(--dsw-alias-label-secondary);border-color:var(--dsw-alias-border-l1);}
+.nr-root[data-theme=auto] .nr-doc-wm span{color:color-mix(in srgb,var(--dsw-alias-label-primary) 6%,transparent);}
+.nr-root[data-theme=auto] .nr-doc .nr-p{color:var(--dsw-alias-label-primary);}
+.nr-root[data-theme=auto] .nr-doc .nr-q{color:var(--dsw-alias-label-secondary);border-left-color:var(--dsw-alias-border-l2);}
+.nr-root[data-theme=auto] .nr-doc .nr-pre{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-border-l1);}
+.nr-root[data-theme=auto] .nr-doc .nr-foot{background:var(--dsw-alias-bg-base);border-top-color:var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary);}
+.nr-root[data-theme=auto] .nr-doc .nr-nav{color:var(--dsw-alias-label-secondary);}
+.nr-root[data-theme=auto] .nr-doc .nr-nav:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);}
+.nr-root[data-theme=auto] .nr-doc .nr-foot-pct{color:var(--dsw-alias-label-primary);}
+.nr-root[data-theme=auto] .nr-doc-cap{color:var(--dsw-alias-label-secondary);}
+.nr-root[data-theme=auto] .nr-doc-table table{color:var(--dsw-alias-label-primary);}
+.nr-root[data-theme=auto] .nr-doc-table th,.nr-root[data-theme=auto] .nr-doc-table td{border-color:var(--dsw-alias-border-l1);}
+.nr-root[data-theme=auto] .nr-doc-table th{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);}
+.nr-root[data-theme=auto] .nr-doc-table .up{color:var(--dsw-alias-state-error-primary);}
+.nr-root[data-theme=auto] .nr-doc-table .down{color:var(--dsw-alias-state-success-primary);}
+.nr-root[data-theme=auto] .nr-doc-table .nr-doc-bar{background:var(--dsw-alias-bg-layer-2);}
+.nr-root[data-theme=auto] .nr-doc-table .nr-doc-bar i{background:var(--dsw-alias-brand-primary);}
+.nr-root[data-theme=auto] .nr-doc-note{color:var(--dsw-alias-label-secondary);}
 .nr-mini{appearance:none;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:6px;padding:3px 8px;font:inherit;font-size:10.5px;cursor:pointer;white-space:nowrap;}
 .nr-mini:hover{border-color:var(--dsw-alias-brand-primary);}
 .nr-tab-title{font-weight:inherit;}
