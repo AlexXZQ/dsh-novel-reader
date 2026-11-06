@@ -1,0 +1,5 @@
+# dsh-novel-reader — one Host row for the local library and its routes.
+# The Client half registers the right-Sidebar tab type and its entry points.
+- insert:
+    - id: novel-reader
+      name: dsh-novel-reader

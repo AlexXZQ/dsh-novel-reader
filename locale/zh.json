@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "本地阅读器",
+    "description": "在右侧边栏打开本地电子书（TXT / EPUB / Markdown），自动记住进度；默认伪装成经营分析文档，Esc 一键切成全屏 Excel 表格。"
+  }
+}

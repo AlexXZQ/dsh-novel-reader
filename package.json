@@ -1,0 +1,56 @@
+{
+  "name": "dsh-novel-reader",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "本地电子书阅读器：右侧边栏读 TXT / EPUB，自动记住进度，并带文档伪装与全屏表格老板键",
+  "license": "MIT",
+  "author": "AlexXZQ",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlexXZQ/dsh-novel-reader.git"
+  },
+  "homepage": "https://github.com/AlexXZQ/dsh-novel-reader#readme",
+  "bugs": {
+    "url": "https://github.com/AlexXZQ/dsh-novel-reader/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "ebook",
+    "reader",
+    "epub",
+    "sidebar"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "LICENSE",
+    "docs/*.png"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
